@@ -12,20 +12,6 @@ export class DiscordConfigService implements DiscordOptionsFactory {
     return {
       token: process.env.TOKEN,
       commandPrefix: '$',
-      allowGuilds: [''],
-      denyGuilds: [''],
-      allowCommands: [
-        {
-          name: '',
-          channels: [''],
-          users: [''],
-          channelType: ['dm'],
-        },
-      ],
-      webhook: {
-        webhookId: '',
-        webhookToken: '',
-      },
       usePipes: [TransformPipe, ValidationPipe],
     };
   }

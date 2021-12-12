@@ -3,7 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { BotGateway } from './bot.gateway';
 import { DiscordModule } from 'discord-nestjs';
 import { DiscordConfigService } from './discord-config/discord-config.service';
-import { DealerService } from './poker/dealer.service';
+import { PokerModule } from './poker/poker.module';
 
 @Module({
   imports: [
