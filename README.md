@@ -1,7 +1,8 @@
-# Nest.js Discord Bot
+# Zyklone Bot
 
-Name: Zyklone Bot
+Hello, I am Zyklone, a multi-purpose bot.
 
-Function: Still Unknown
+## What I Can Do
 
-Prefix: $
+- Be A Poker Dealer
+- ...
