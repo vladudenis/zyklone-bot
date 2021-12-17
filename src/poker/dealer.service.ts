@@ -1,14 +1,8 @@
-import {
-  forwardRef,
-  Inject,
-  Injectable,
-  InternalServerErrorException,
-} from '@nestjs/common';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { Player } from './classes/player.class';
 import { Deck } from './classes/deck.class';
 import { Card } from './classes/card.class';
 import ChipsInterface from './interfaces/chips.interface';
-import { BotGateway } from '../bot.gateway';
 
 const GameStates: Map<string, [boolean, boolean, boolean]> = new Map([
   ['Start', [false, false, false]],
@@ -32,11 +26,6 @@ enum WinningHands {
 
 @Injectable()
 export class DealerService {
-  constructor(
-    @Inject(forwardRef(() => BotGateway))
-    private readonly botGateway: BotGateway,
-  ) {}
-
   // Per Game
   private deck: Deck;
   private players: Player[];

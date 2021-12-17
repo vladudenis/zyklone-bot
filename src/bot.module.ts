@@ -11,6 +11,7 @@ import { PokerModule } from './poker/poker.module';
     DiscordModule.forRootAsync({
       useClass: DiscordConfigService,
     }),
+    PokerModule,
   ],
   providers: [BotGateway, DiscordConfigService],
 })

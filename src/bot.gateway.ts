@@ -1,20 +1,11 @@
-import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
-import {
-  Once,
-  OnCommand,
-  Client,
-  ClientProvider,
-  Content,
-} from 'discord-nestjs';
+import { Injectable, Logger } from '@nestjs/common';
+import { Once, OnCommand, Client, ClientProvider } from 'discord-nestjs';
 import { Message } from 'discord.js';
 import { DealerService } from './poker/dealer.service';
 
 @Injectable()
 export class BotGateway {
-  constructor(
-    @Inject(forwardRef(() => DealerService))
-    private readonly dealerService: DealerService,
-  ) {}
+  constructor(private readonly dealerService: DealerService) {}
 
   private readonly logger = new Logger(BotGateway.name);
 
@@ -66,7 +57,7 @@ export class BotGateway {
 
       if (player) {
         if (this.dealerService.getCurrentTurn.getId !== message.author.id) {
-          await message.reply(
+          await message.channel.send(
             'Wait until your turn has come in order to throw your hand.',
           );
           return;
@@ -77,36 +68,34 @@ export class BotGateway {
           `Player ${message.author.id} has thrown his hand.`,
         );
       } else {
-        await message.reply(
+        await message.channel.send(
           "You cannot forfeit a match that you aren't participating in.",
         );
       }
     } else if (!this.dealerService.matchIsOngoing) {
-      await message.reply(
+      await message.channel.send(
         'This command only works when a poker match is ongoing.',
       );
     }
   }
 
   @OnCommand({ name: 'bet', channelType: ['text'] })
-  async onCommandBet(
-    message: Message,
-    @Content() content: string,
-  ): Promise<void> {
+  async onCommandBet(message: Message, content: string): Promise<void> {
     if (!message.author.bot && this.dealerService.matchIsOngoing) {
       const player = this.dealerService.findPlayer(message.author.id);
 
       if (player) {
         if (this.dealerService.getCurrentTurn.getId !== message.author.id) {
-          await message.reply('Wait until your turn has come in order to bet.');
+          await message.channel.send(
+            'Wait until your turn has come in order to bet.',
+          );
           return;
         }
 
         // to do: parse content string and turn into an object like Chips
         const amount = isNaN(+content) === true ? false : +content;
-
         if (!amount) {
-          await message.reply('Please bet a numeric amount.');
+          await message.channel.send('Please bet a numeric amount.');
           return;
         }
 
@@ -121,12 +110,12 @@ export class BotGateway {
           );
         }
       } else {
-        await message.reply(
+        await message.channel.send(
           "You cannot bet in a match that you aren't participating in.",
         );
       }
-    } else if (!this.dealerService.matchIsOngoing) {
-      await message.reply(
+    } else if (!message.author.bot && !this.dealerService.matchIsOngoing) {
+      await message.channel.send(
         'This command only works when a poker match is ongoing.',
       );
     }
