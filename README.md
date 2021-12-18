@@ -1,12 +1,11 @@
 # Zyklone Bot
 
-Hello, I'm Zyklone, a multi-purpose Discord bot.
+Hello, I'm Zyklone, a poker dealer Discord bot.
 
 ## What I Can Do
 
 - Be A Poker Dealer
-- Interact With The WebUntis API (coming next)
-- ... more coming soon
+- (more features coming soon)
 
 ## Setup
 
