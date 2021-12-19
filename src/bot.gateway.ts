@@ -1,11 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Once, OnCommand, Client, ClientProvider } from 'discord-nestjs';
 import { Message } from 'discord.js';
-import { DealerService } from './poker/dealer.service';
+import { PokerService } from './poker/poker.service';
 
 @Injectable()
 export class BotGateway {
-  constructor(private readonly dealerService: DealerService) {}
+  constructor(private readonly dealerService: PokerService) {}
 
   private readonly logger = new Logger(BotGateway.name);
 
@@ -19,40 +19,38 @@ export class BotGateway {
     );
   }
 
-  @OnCommand({ name: 'code', channelType: ['text'] })
+  @OnCommand({ name: 'sourcecode', channelType: ['text'], isIgnoreBotMessage: true })
   async onCommandCode(message: Message) {
     await message.channel.send('https://github.com/vladudenis/zyklone-bot');
   }
 
-  @OnCommand({ name: 'poker', channelType: ['text'] })
+  @OnCommand({ name: 'poker', channelType: ['text'], isIgnoreBotMessage: true })
   async onCommandPoker(message: Message): Promise<void> {
     await message.channel.send(
       `User ${message.author} has proposed a poker match. Use the command "$join" the match.`,
     );
   }
 
-  @OnCommand({ name: 'join', channelType: ['text'] })
+  @OnCommand({ name: 'join', channelType: ['text'], isIgnoreBotMessage: true })
   async onCommandJoin(message: Message): Promise<void> {
-    if (!message.author.bot) {
-      if (this.dealerService.matchIsOngoing) {
-        await message.channel.send(
-          'A match has already started. Please wait until it has finished to propose another one.',
-        );
-        return;
-      }
+    if (this.dealerService.matchIsOngoing) {
+      await message.channel.send(
+        'A match has already started. Please wait until it has finished to propose another one.',
+      );
+      return;
+    }
 
-      this.dealerService.addInterestedPlayer(message.author.id);
+    this.dealerService.addInterestedPlayer(message.author.id);
 
-      if (this.dealerService.getInterestedPlayers.length === 4) {
-        await message.channel.send('Setting up poker table...');
-        this.dealerService.initPokerTable();
-      }
+    if (this.dealerService.getInterestedPlayers.length === 4) {
+      await message.channel.send('Setting up poker table...');
+      this.dealerService.initPokerTable();
     }
   }
 
-  @OnCommand({ name: 'throw', channelType: ['text'] })
+  @OnCommand({ name: 'throw', channelType: ['text'], isIgnoreBotMessage: true })
   async onCommandThrow(message: Message): Promise<void> {
-    if (!message.author.bot && this.dealerService.matchIsOngoing) {
+    if (this.dealerService.matchIsOngoing) {
       const player = this.dealerService.findPlayer(message.author.id);
 
       if (player) {
@@ -63,7 +61,7 @@ export class BotGateway {
           return;
         }
 
-        this.dealerService.playerThrowsHand(player);
+        this.dealerService.playerThrowsHand(player, message);
         await message.channel.send(
           `Player ${message.author.id} has thrown his hand.`,
         );
@@ -72,16 +70,16 @@ export class BotGateway {
           "You cannot forfeit a match that you aren't participating in.",
         );
       }
-    } else if (!this.dealerService.matchIsOngoing) {
+    } else {
       await message.channel.send(
         'This command only works when a poker match is ongoing.',
       );
     }
   }
 
-  @OnCommand({ name: 'bet', channelType: ['text'] })
+  @OnCommand({ name: 'bet', channelType: ['text'], isIgnoreBotMessage: true })
   async onCommandBet(message: Message, content: string): Promise<void> {
-    if (!message.author.bot && this.dealerService.matchIsOngoing) {
+    if (this.dealerService.matchIsOngoing) {
       const player = this.dealerService.findPlayer(message.author.id);
 
       if (player) {
@@ -92,29 +90,36 @@ export class BotGateway {
           return;
         }
 
-        // to do: parse content string and turn into an object like Chips
         const amount = isNaN(+content) === true ? false : +content;
         if (!amount) {
           await message.channel.send('Please bet a numeric amount.');
           return;
         }
 
-        this.dealerService.playerMakesBet(player, amount);
-        if (player.getChips.getChipsRawAmount === amount) {
-          await message.channel.send(
-            `Player ${message.author.id} has gone all in!`,
-          );
+        const response = this.dealerService.playerMakesBet(
+          player,
+          amount,
+          message,
+        );
+        if (response === true) {
+          if (player.getChips.getChipsRawAmount === amount) {
+            await message.channel.send(
+              `Player ${message.author.id} has gone all in!`,
+            );
+          } else {
+            await message.channel.send(
+              `Player ${message.author.id} has made a bet of ${amount}.`,
+            );
+          }
         } else {
-          await message.channel.send(
-            `Player ${message.author.id} has made a bet of ${amount}.`,
-          );
+          await message.channel.send(response);
         }
       } else {
         await message.channel.send(
           "You cannot bet in a match that you aren't participating in.",
         );
       }
-    } else if (!message.author.bot && !this.dealerService.matchIsOngoing) {
+    } else {
       await message.channel.send(
         'This command only works when a poker match is ongoing.',
       );

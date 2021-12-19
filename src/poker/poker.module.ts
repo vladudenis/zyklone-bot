@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
-import { DealerService } from './dealer.service';
+import { PokerService } from './poker.service';
 
 @Module({
-  providers: [DealerService],
-  exports: [DealerService],
+  providers: [PokerService],
+  exports: [PokerService],
 })
 export class PokerModule {}
