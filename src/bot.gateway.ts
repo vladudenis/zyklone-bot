@@ -1,5 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Once, OnCommand, Client, ClientProvider } from 'discord-nestjs';
+import {
+  Once,
+  OnCommand,
+  Client,
+  ClientProvider,
+  Context,
+  Content,
+} from 'discord-nestjs';
 import { Message } from 'discord.js';
 import { PokerService } from './poker/poker.service';
 
@@ -19,16 +26,26 @@ export class BotGateway {
     );
   }
 
-  @OnCommand({ name: 'sourcecode', channelType: ['text'], isIgnoreBotMessage: true })
+  @OnCommand({
+    name: 'sourcecode',
+    channelType: ['text'],
+    isIgnoreBotMessage: true,
+  })
   async onCommandCode(message: Message) {
     await message.channel.send('https://github.com/vladudenis/zyklone-bot');
   }
 
-  @OnCommand({ name: 'poker', channelType: ['text'], isIgnoreBotMessage: true })
+  @OnCommand({
+    name: 'poker',
+    channelType: ['text'],
+    isIgnoreBotMessage: true,
+  })
   async onCommandPoker(message: Message): Promise<void> {
     await message.channel.send(
-      `User ${message.author} has proposed a poker match. Use the command "$join" the match.`,
+      `User ${message.author} has proposed a poker match. Use the command "$join" to join the match.
+      The match will automatically start once the cap of 4 players has been reached.`,
     );
+    // this.dealerService.addInterestedPlayer(message.author.tag);
   }
 
   @OnCommand({ name: 'join', channelType: ['text'], isIgnoreBotMessage: true })
@@ -40,30 +57,30 @@ export class BotGateway {
       return;
     }
 
-    this.dealerService.addInterestedPlayer(message.author.id);
+    this.dealerService.addInterestedPlayer(message.author.tag);
 
-    if (this.dealerService.getInterestedPlayers.length === 4) {
+    if (this.dealerService.getInterestedPlayers.length === 1) {
       await message.channel.send('Setting up poker table...');
-      this.dealerService.initPokerTable();
+      await this.dealerService.initPokerTable(message);
     }
   }
 
   @OnCommand({ name: 'throw', channelType: ['text'], isIgnoreBotMessage: true })
   async onCommandThrow(message: Message): Promise<void> {
     if (this.dealerService.matchIsOngoing) {
-      const player = this.dealerService.findPlayer(message.author.id);
+      const player = this.dealerService.findPlayer(message.author.tag);
 
       if (player) {
-        if (this.dealerService.getCurrentTurn.getId !== message.author.id) {
+        if (this.dealerService.getCurrentTurn.getTag !== message.author.tag) {
           await message.channel.send(
             'Wait until your turn has come in order to throw your hand.',
           );
           return;
         }
 
-        this.dealerService.playerThrowsHand(player, message);
+        await this.dealerService.playerThrowsHand(player, message);
         await message.channel.send(
-          `Player ${message.author.id} has thrown his hand.`,
+          `Player ${message.author.tag} has thrown his hand.`,
         );
       } else {
         await message.channel.send(
@@ -78,13 +95,16 @@ export class BotGateway {
   }
 
   @OnCommand({ name: 'bet', channelType: ['text'], isIgnoreBotMessage: true })
-  async onCommandBet(message: Message, content: string): Promise<void> {
+  async onCommandBet(
+    @Content() content: string,
+    @Context() [context]: [Message],
+  ): Promise<void> {
     if (this.dealerService.matchIsOngoing) {
-      const player = this.dealerService.findPlayer(message.author.id);
+      const player = this.dealerService.findPlayer(context.author.tag);
 
       if (player) {
-        if (this.dealerService.getCurrentTurn.getId !== message.author.id) {
-          await message.channel.send(
+        if (this.dealerService.getCurrentTurn.getTag !== context.author.tag) {
+          await context.channel.send(
             'Wait until your turn has come in order to bet.',
           );
           return;
@@ -92,35 +112,35 @@ export class BotGateway {
 
         const amount = isNaN(+content) === true ? false : +content;
         if (!amount) {
-          await message.channel.send('Please bet a numeric amount.');
+          await context.channel.send('Please bet a numeric amount.');
           return;
         }
 
         const response = this.dealerService.playerMakesBet(
           player,
           amount,
-          message,
+          context,
         );
-        if (response === true) {
+        if (typeof response !== 'string') {
           if (player.getChips.getChipsRawAmount === amount) {
-            await message.channel.send(
-              `Player ${message.author.id} has gone all in!`,
+            await context.channel.send(
+              `Player ${context.author.tag} has gone all in!`,
             );
           } else {
-            await message.channel.send(
-              `Player ${message.author.id} has made a bet of ${amount}.`,
+            await context.channel.send(
+              `Player ${context.author.tag} has made a bet of ${amount}.`,
             );
           }
         } else {
-          await message.channel.send(response);
+          await context.channel.send(response);
         }
       } else {
-        await message.channel.send(
+        await context.channel.send(
           "You cannot bet in a match that you aren't participating in.",
         );
       }
     } else {
-      await message.channel.send(
+      await context.channel.send(
         'This command only works when a poker match is ongoing.',
       );
     }

@@ -7,14 +7,14 @@ export class Player {
   private readonly chips: Chips;
 
   constructor(
-    private readonly id: string,
+    private readonly tag: string,
     private readonly hand: [Card, Card],
   ) {
     this.chips = new Chips();
   }
 
-  get getId(): string {
-    return this.id;
+  get getTag(): string {
+    return this.tag;
   }
 
   get getHand(): [Card, Card] {

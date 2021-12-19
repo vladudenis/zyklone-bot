@@ -39,8 +39,8 @@ enum WinningConditions {
 export class PokerService {
   // Per Game
   private deck: Deck;
-  private players: Player[];
-  private interestedPlayers: string[];
+  private players: Player[] = [];
+  private interestedPlayers: string[] = [];
   private match: boolean;
   private gameState: 'Start' | 'Flop' | 'Turn' | 'River';
 
@@ -138,7 +138,6 @@ export class PokerService {
 
     // Determine highest win code and return it
     const winCons: number[] = [WinningConditions.HIGH_CARD];
-
     if (
       straight &&
       flush &&
@@ -260,7 +259,7 @@ export class PokerService {
             break;
         }
       }
-      await message.channel.send(`${winningPlayer.getId} has won this round!`);
+      await message.channel.send(`${winningPlayer.getTag} has won this round!`);
     } else {
       await message.channel.send("Nobody has won the round! It's a dead draw!");
     }
@@ -268,7 +267,7 @@ export class PokerService {
     if (this.players.length) {
       await message.channel.send('Starting a new round...');
     } else {
-      await message.channel.send(`${winningPlayer.getId} has won the game!`);
+      await message.channel.send(`${winningPlayer.getTag} has won the game!`);
       this.resetTable();
     }
   }
@@ -315,6 +314,7 @@ export class PokerService {
     }
 
     this.setCurrentTurn = this.players[(playerIndex + 1) % this.players.length];
+    await message.channel.send(`It is ${message.author.tag}'s turn.`);
   }
 
   private resetTable(): void {
@@ -332,33 +332,35 @@ export class PokerService {
     this.setNewGameState = 'Start';
   }
 
-  findPlayer(id): Player | false {
-    this.players.forEach((player) => {
-      if (player.getId === id) {
-        return player;
-      }
-    });
-
-    return false;
+  findPlayer(tag: string): Player | false {
+    const foundPlayer = this.players.filter((player) => player.getTag === tag);
+    if (foundPlayer.length) {
+      return foundPlayer[0];
+    } else {
+      return false;
+    }
   }
 
-  addInterestedPlayer(playerId: string): void {
-    this.interestedPlayers.push(playerId);
+  addInterestedPlayer(playerTag: string): void {
+    this.interestedPlayers.push(playerTag);
   }
 
-  initPokerTable(): void {
+  async initPokerTable(message: Message): Promise<void> {
     this.deck = new Deck();
-    this.interestedPlayers.forEach((playerId) => {
+    this.interestedPlayers.forEach((playerTag) => {
       const firstCard = this.deck.pickRandomCard;
       const secondCard = this.deck.pickRandomCard;
       const hand: [Card, Card] = [firstCard, secondCard];
 
-      this.players.push(new Player(playerId, hand));
+      this.players.push(new Player(playerTag, hand));
     });
     this.setInterestedPlayers = [];
     this.setMatch = true;
     this.setCurrentTurn = this.players[0];
     this.setNewGameState = 'Start';
+    await message.channel.send(
+      `Poker table has been set up. It is ${this.getCurrentTurn.getTag}'s turn.`,
+    );
   }
 
   async playerMakesBet(
@@ -366,7 +368,7 @@ export class PokerService {
     amount: number,
     message: Message,
   ): Promise<string | true> {
-    if (this.turn.getId === player.getId) {
+    if (this.turn.getTag === player.getTag) {
       const playerChips: Chips = player.getChips;
       const playerWealth: ChipsInterface = playerChips.getChipWealth;
 
@@ -422,9 +424,9 @@ export class PokerService {
   }
 
   async playerThrowsHand(player: Player, message: Message): Promise<void> {
-    if (this.turn.getId === player.getId) {
+    if (this.turn.getTag === player.getTag) {
       this.players = this.players.filter(
-        (thisPlayer) => thisPlayer.getId !== player.getId,
+        (thisPlayer) => thisPlayer.getTag !== player.getTag,
       );
       await this.updateGameState(message);
     } else {
