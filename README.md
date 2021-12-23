@@ -4,7 +4,10 @@ Hello, I'm Zyklone, a poker dealer Discord bot.
 
 ## What I Can Do
 
-- Be A Poker Dealer
+- Set up a poker table for a maximum of 5 players inside a channel
+- Shuffle cards and distribute them to players
+- Determine the winner of each round, as well as the winner of the match
+- Send informative messages (such as your hand, whose turn it is, etc.) in the channel or via DM
 - (more features coming soon)
 
 ## Setup
