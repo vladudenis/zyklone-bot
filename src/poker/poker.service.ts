@@ -43,10 +43,12 @@ export class PokerService {
   private interestedPlayers: string[] = [];
   private match: boolean;
   private gameState: 'Start' | 'Flop' | 'Turn' | 'River';
+  private cardSet: Card[];
 
   // Per Round
-  private cardSet: Card[];
   private betHeap: ChipsInterface;
+  private extendRound: boolean;
+  private extendRoundDecisionPending: boolean;
 
   // Per Turn
   private turn: Player;
@@ -273,10 +275,20 @@ export class PokerService {
   }
 
   private async updateGameState(message: Message): Promise<void> {
-    const playerIndex = this.players.indexOf(this.turn);
+    const playerIndex = this.players.indexOf(this.getCurrentTurn);
     const finishedRound = (playerIndex + 1) % this.players.length === 0;
 
     if (finishedRound) {
+      this.setCurrentTurn = this.players[0];
+      await message.channel.send(
+        `${this.getCurrentTurn.getTag}, do you want to raise and continue the round, or do you want to move on to the next round?
+        Use the command "raise" to raise or "pass" to move on to the next round.`,
+      );
+      this.extendRoundDecisionPending = true;
+      return;
+    }
+
+    if (finishedRound && !this.extendRound) {
       switch (this.gameState) {
         case 'Start':
           this.setNewGameState = 'Flop';
@@ -284,19 +296,19 @@ export class PokerService {
           const secondCard = this.deck.pickRandomCard;
           const thirdCard = this.deck.pickRandomCard;
           this.cardSet = [firstCard, secondCard, thirdCard];
-          await message.channel.send('Placing flop on the table...');
+          await message.channel.send('Placed FLOP on the table.');
           break;
         case 'Flop':
           this.setNewGameState = 'Turn';
           const fourthCard = this.deck.pickRandomCard;
           this.cardSet.push(fourthCard);
-          await message.channel.send('Placing turn on the table...');
+          await message.channel.send('Placed TURN on the table.');
           break;
         case 'Turn':
           this.setNewGameState = 'River';
           const fifthCard = this.deck.pickRandomCard;
           this.cardSet.push(fifthCard);
-          await message.channel.send('Placing river on the table...');
+          await message.channel.send('Placed RIVER on the table.');
           break;
         case 'River':
           await this.checkWhoWon(message);
@@ -311,10 +323,14 @@ export class PokerService {
           };
           break;
       }
+
+      this.setCurrentTurn = this.players[0];
+      await message.channel.send(`It is ${this.getCurrentTurn.getTag}'s turn.`);
+      return;
     }
 
     this.setCurrentTurn = this.players[(playerIndex + 1) % this.players.length];
-    await message.channel.send(`It is ${message.author.tag}'s turn.`);
+    await message.channel.send(`It is ${this.getCurrentTurn.getTag}'s turn.`);
   }
 
   private resetTable(): void {
@@ -358,75 +374,132 @@ export class PokerService {
     this.setMatch = true;
     this.setCurrentTurn = this.players[0];
     this.setNewGameState = 'Start';
+    this.betHeap = {
+      hundreds: 0,
+      fifties: 0,
+      twenties: 0,
+      tens: 0,
+      fives: 0,
+    };
     await message.channel.send(
       `Poker table has been set up. It is ${this.getCurrentTurn.getTag}'s turn.`,
     );
+  }
+
+  async playerPasses(player: Player, message: Message): Promise<void> {
+    if (this.extendRoundDecisionPending) {
+      this.extendRound = false;
+      this.extendRoundDecisionPending = false;
+    }
+
+    await message.channel.send(
+      `Player ${this.getCurrentTurn.getTag} has passed.`,
+    );
+    await this.updateGameState(message);
   }
 
   async playerMakesBet(
     player: Player,
     amount: number,
     message: Message,
-  ): Promise<string | true> {
-    if (this.turn.getTag === player.getTag) {
-      const playerChips: Chips = player.getChips;
-      const playerWealth: ChipsInterface = playerChips.getChipWealth;
+  ): Promise<void> {
+    if (this.extendRoundDecisionPending) {
+      this.extendRound = true;
+      this.extendRoundDecisionPending = false;
+    }
 
-      if (amount % 100 === 0) {
-        if (playerWealth.hundreds < amount / 100) {
-          return `You only have ${playerWealth.hundreds} tokens worth 100. Please bet an amount that you actually own!`;
-        }
-        for (let i = 0; i < amount / 100; i++) {
-          playerChips.takeHundreds;
-          this.betHeap.hundreds += amount / 100;
-        }
-      } else if (amount % 50 === 0) {
-        if (playerWealth.fifties < amount / 50) {
-          return `You only have ${playerWealth.fifties} tokens worth 50. Please bet an amount that you actually own!`;
-        }
-        for (let i = 0; i < amount / 50; i++) {
-          playerChips.takeFifties;
-          this.betHeap.fifties += amount / 50;
-        }
-      } else if (amount % 20 === 0) {
-        if (playerWealth.twenties < amount / 20) {
-          return `You only have ${playerWealth.twenties} tokens worth 20. Please bet an amount that you actually own!`;
-        }
-        for (let i = 0; i < amount / 20; i++) {
-          playerChips.takeTwenties;
-          this.betHeap.twenties += amount / 20;
-        }
-      } else if (amount % 10 === 0) {
-        if (playerWealth.tens < amount / 10) {
-          return `You only have ${playerWealth.tens} tokens worth 10. Please bet an amount that you actually own!`;
-        }
-        for (let i = 0; i < amount / 10; i++) {
-          playerChips.takeTens;
-          this.betHeap.tens += amount / 10;
-        }
-      } else if (amount % 5 === 0) {
-        if (playerWealth.fives < amount / 5) {
-          return `You only have ${playerWealth.fives} tokens worth 5. Please bet an amount that you actually own!`;
-        }
-        for (let i = 0; i < amount / 5; i++) {
-          playerChips.takeFives;
-          this.betHeap.fives += amount / 5;
-        }
-      } else {
-        return 'You can only use your tokens to bet. Please bet a correct amount!';
+    const playerChips: Chips = player.getChips;
+    const playerWealth: ChipsInterface = playerChips.getChipWealth;
+    let rawBetAmount = 0;
+
+    if (amount === player.getChips.getChipsRawAmount) {
+      this.betHeap.hundreds += playerWealth.hundreds;
+      this.betHeap.fifties += playerWealth.fifties;
+      this.betHeap.twenties += playerWealth.twenties;
+      this.betHeap.tens += playerWealth.tens;
+      this.betHeap.fives += playerWealth.fives;
+
+      playerChips.takeHundreds(playerWealth.hundreds);
+      playerChips.takeFifties(playerWealth.fifties);
+      playerChips.takeTwenties(playerWealth.twenties);
+      playerChips.takeTens(playerWealth.tens);
+      playerChips.takeFives(playerWealth.fives);
+    } else if (amount % 100 === 0) {
+      if (playerWealth.hundreds < amount / 100) {
+        await message.channel.send(
+          `You only have ${playerWealth.hundreds} tokens worth 100. Please bet an amount that you actually own!`,
+        );
+        return;
+      }
+      this.betHeap.hundreds += amount / 100;
+      playerChips.takeHundreds(amount / 100);
+    } else if (amount % 50 === 0) {
+      if (playerWealth.fifties < amount / 50) {
+        await message.channel.send(
+          `You only have ${playerWealth.fifties} tokens worth 50. Please bet an amount that you actually own!`,
+        );
+        return;
       }
 
-      await this.updateGameState(message);
-      return true;
+      this.betHeap.fifties += amount / 50;
+      playerChips.takeFifties(amount / 50);
+    } else if (amount % 20 === 0) {
+      if (playerWealth.twenties < amount / 20) {
+        await message.channel.send(
+          `You only have ${playerWealth.twenties} tokens worth 20. Please bet an amount that you actually own!`,
+        );
+        return;
+      }
+
+      this.betHeap.twenties += amount / 20;
+      playerChips.takeTwenties(amount / 20);
+    } else if (amount % 10 === 0) {
+      if (playerWealth.tens < amount / 10) {
+        await message.channel.send(
+          `You only have ${playerWealth.tens} tokens worth 10. Please bet an amount that you actually own!`,
+        );
+        return;
+      }
+
+      this.betHeap.tens += amount / 10;
+      playerChips.takeTens(amount / 10);
+    } else if (amount % 5 === 0) {
+      if (playerWealth.fives < amount / 5) {
+        await message.channel.send(
+          `You only have ${playerWealth.fives} tokens worth 5. Please bet an amount that you actually own!`,
+        );
+        return;
+      }
+
+      this.betHeap.fives += amount / 5;
+      playerChips.takeFives(amount / 5);
     } else {
-      throw new InternalServerErrorException('Player turn inconsistency.');
+      await message.channel.send(
+        'You can only use tokens to bet. Please bet a correct amount!',
+      );
+      return;
     }
+
+    rawBetAmount += amount;
+
+    if (this.turn.getChips.getChipsRawAmount === rawBetAmount) {
+      await message.channel.send(`Player ${this.turn.getTag} has gone all in!`);
+    } else if (this.turn.getChips.getChipsRawAmount < rawBetAmount) {
+      await message.channel.send(
+        `Player ${this.turn.getTag} has made a bet of ${amount}.`,
+      );
+    }
+
+    await this.updateGameState(message);
   }
 
-  async playerThrowsHand(player: Player, message: Message): Promise<void> {
+  async playerFoldsHand(player: Player, message: Message): Promise<void> {
     if (this.turn.getTag === player.getTag) {
       this.players = this.players.filter(
         (thisPlayer) => thisPlayer.getTag !== player.getTag,
+      );
+      await message.channel.send(
+        `Player ${message.author.tag} has folded his hand.`,
       );
       await this.updateGameState(message);
     } else {

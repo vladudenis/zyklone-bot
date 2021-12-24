@@ -2,11 +2,11 @@ import { Injectable } from '@nestjs/common';
 import ChipsInterface from '../interfaces/chips.interface';
 
 enum ChipTypes {
-  Fives = 5,
-  Tens = 10,
-  Twenties = 20,
-  Fifties = 50,
-  Hundreds = 100,
+  Fives = 'fives',
+  Tens = 'tens',
+  Twenties = 'twenties',
+  Fifties = 'fifties',
+  Hundreds = 'hundreds',
 }
 
 @Injectable()
@@ -28,24 +28,33 @@ export class Chips {
   }
 
   get getChipsRawAmount(): number {
-    return Object.values(this.chips).reduce((prev, current) => {
-      switch (current) {
+    let rawAmount = 0;
+
+    for (const [key, value] of Object.entries(this.chips)) {
+      switch (key) {
         case ChipTypes.Fives:
-          return prev + current * 5;
+          rawAmount += value * 5;
+          break;
 
         case ChipTypes.Tens:
-          return prev + current * 10;
+          rawAmount += value * 10;
+          break;
 
         case ChipTypes.Twenties:
-          return prev + current * 20;
+          rawAmount += value * 20;
+          break;
 
         case ChipTypes.Fifties:
-          return prev + current * 50;
+          rawAmount += value * 50;
+          break;
 
         case ChipTypes.Hundreds:
-          return prev + current * 100;
+          rawAmount += value * 100;
+          break;
       }
-    });
+    }
+
+    return rawAmount;
   }
 
   set addFives(amount) {
