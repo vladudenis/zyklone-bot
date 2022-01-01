@@ -5,6 +5,7 @@ import { Card } from './card.class';
 @Injectable()
 export class Player {
   private readonly chips: Chips;
+  private readonly betAmount: Chips;
 
   constructor(
     private readonly tag: string,
@@ -23,5 +24,9 @@ export class Player {
 
   get getChips(): Chips {
     return this.chips;
+  }
+
+  get getBetAmount(): Chips{
+    return this.betAmount;
   }
 }

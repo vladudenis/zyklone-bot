@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Player } from './classes/player.class';
 import { Deck } from './classes/deck.class';
 import { Card } from './classes/card.class';
@@ -39,16 +39,20 @@ enum WinningConditions {
 export class PokerService {
   // Per Game
   private deck: Deck;
-  private players: Player[] = [];
-  private interestedPlayers: string[] = [];
-  private match: boolean;
-  private gameState: 'Start' | 'Flop' | 'Turn' | 'River';
+  private players: Player[];
+  private interestedPlayers: string[];
+  private game: boolean;
+
+  // Per Match
   private cardSet: Card[];
+  private betHeap: Chips;
+  private matchState: 'Start' | 'Flop' | 'Turn' | 'River';
+  private activePlayers: Player[];
 
   // Per Round
-  private betHeap: ChipsInterface;
   private extendRound: boolean;
   private extendRoundDecisionPending: boolean;
+  private lastPlayerBet: Chips;
 
   // Per Turn
   private turn: Player;
@@ -57,28 +61,36 @@ export class PokerService {
     return this.interestedPlayers;
   }
 
-  get matchIsOngoing(): boolean {
-    return this.match;
+  get gameIsOngoing(): boolean {
+    return this.game;
   }
 
   get getCurrentTurn(): Player {
     return this.turn;
   }
 
-  private set setMatch(state: boolean) {
-    this.match = state;
+  get getCurrentGameState(): 'Start' | 'Flop' | 'Turn' | 'River' {
+    return this.matchState;
+  }
+
+  private set setGame(state: boolean) {
+    this.game = state;
   }
 
   private set setInterestedPlayers(players: string[]) {
     this.interestedPlayers = players;
   }
 
+  private set setActivePlayers(players: Player[]) {
+    this.activePlayers = players;
+  }
+
   private set setCurrentTurn(player: Player) {
     this.turn = player;
   }
 
-  private set setNewGameState(state: 'Start' | 'Flop' | 'Turn' | 'River') {
-    this.gameState = state;
+  private set setNewMatchState(state: 'Start' | 'Flop' | 'Turn' | 'River') {
+    this.matchState = state;
   }
 
   private bubbleSortCards(arr: Card[]): Card[] {
@@ -191,7 +203,7 @@ export class PokerService {
     let winningPlayer: Player;
     const tie: Player[] = [];
 
-    this.players.forEach((player) => {
+    this.activePlayers.forEach((player) => {
       if (
         !winningPlayer ||
         this.computeHand(player.getHand) >
@@ -235,51 +247,41 @@ export class PokerService {
       for (const [key, value] of Object.entries(this.betHeap)) {
         switch (key) {
           case 'hundreds':
-            for (let i = 0; i <= value; i++) {
-              winningPlayerChips.addHundreds;
-            }
+            winningPlayerChips.addHundreds(value);
             break;
           case 'fifties':
-            for (let i = 0; i <= value; i++) {
-              winningPlayerChips.addFifties;
-            }
+            winningPlayerChips.addFifties(value);
             break;
           case 'twenties':
-            for (let i = 0; i <= value; i++) {
-              winningPlayerChips.addTwenties;
-            }
+            winningPlayerChips.addTwenties(value);
             break;
           case 'tens':
-            for (let i = 0; i <= value; i++) {
-              winningPlayerChips.addTens;
-            }
+            winningPlayerChips.addTens(value);
             break;
           case 'fives':
-            for (let i = 0; i <= value; i++) {
-              winningPlayerChips.addFives;
-            }
+            winningPlayerChips.addFives(value);
             break;
         }
       }
-      await message.channel.send(`${winningPlayer.getTag} has won this round!`);
+      await message.channel.send(`${winningPlayer.getTag} has won this match!`);
     } else {
-      await message.channel.send("Nobody has won the round! It's a dead draw!");
+      await message.channel.send("Nobody has won the match! It's a dead draw!");
     }
 
     if (this.players.length) {
-      await message.channel.send('Starting a new round...');
+      await message.channel.send('Starting a new match...');
     } else {
       await message.channel.send(`${winningPlayer.getTag} has won the game!`);
       this.resetTable();
     }
   }
 
-  private async updateGameState(message: Message): Promise<void> {
-    const playerIndex = this.players.indexOf(this.getCurrentTurn);
-    const finishedRound = (playerIndex + 1) % this.players.length === 0;
+  private async updateMatchState(message: Message): Promise<void> {
+    const playerIndex = this.activePlayers.indexOf(this.getCurrentTurn);
+    const finishedRound = (playerIndex + 1) % this.activePlayers.length === 0;
 
     if (finishedRound) {
-      this.setCurrentTurn = this.players[0];
+      this.setCurrentTurn = this.activePlayers[0];
       await message.channel.send(
         `${this.getCurrentTurn.getTag}, do you want to raise and continue the round, or do you want to move on to the next round?
         Use the command "raise" to raise or "pass" to move on to the next round.`,
@@ -289,63 +291,104 @@ export class PokerService {
     }
 
     if (finishedRound && !this.extendRound) {
-      switch (this.gameState) {
+      switch (this.matchState) {
         case 'Start':
-          this.setNewGameState = 'Flop';
+          this.setNewMatchState = 'Flop';
           const firstCard = this.deck.pickRandomCard;
           const secondCard = this.deck.pickRandomCard;
           const thirdCard = this.deck.pickRandomCard;
           this.cardSet = [firstCard, secondCard, thirdCard];
-          await message.channel.send('Placed FLOP on the table.');
+          await message.channel.send(
+            `Placed FLOP on the table: ${firstCard}, ${secondCard}, ${thirdCard}`,
+          );
           break;
         case 'Flop':
-          this.setNewGameState = 'Turn';
+          this.setNewMatchState = 'Turn';
           const fourthCard = this.deck.pickRandomCard;
           this.cardSet.push(fourthCard);
-          await message.channel.send('Placed TURN on the table.');
+          await message.channel.send(`Placed TURN on the table: ${fourthCard}`);
           break;
         case 'Turn':
-          this.setNewGameState = 'River';
+          this.setNewMatchState = 'River';
           const fifthCard = this.deck.pickRandomCard;
           this.cardSet.push(fifthCard);
-          await message.channel.send('Placed RIVER on the table.');
+          await message.channel.send(`Placed RIVER on the table: ${fifthCard}`);
           break;
         case 'River':
           await this.checkWhoWon(message);
-          this.setNewGameState = 'Start';
+          this.setNewMatchState = 'Start';
           this.cardSet = [];
-          this.betHeap = {
-            hundreds: 0,
-            fifties: 0,
-            twenties: 0,
-            tens: 0,
-            fives: 0,
-          };
+          this.betHeap.resetChips();
           break;
       }
 
-      this.setCurrentTurn = this.players[0];
+      this.setCurrentTurn = this.activePlayers[0];
       await message.channel.send(`It is ${this.getCurrentTurn.getTag}'s turn.`);
       return;
     }
 
-    this.setCurrentTurn = this.players[(playerIndex + 1) % this.players.length];
+    this.setCurrentTurn =
+      this.activePlayers[(playerIndex + 1) % this.activePlayers.length];
     await message.channel.send(`It is ${this.getCurrentTurn.getTag}'s turn.`);
+  }
+
+  private async playerBetsSmallBlind(
+    player: Player,
+    message: Message,
+  ): Promise<void> {
+    if (player.getChips.getAvailableFives >= 1) {
+      player.getChips.takeFives(1);
+      await message.channel.send(
+        `Player ${player.getTag} opened with the small blind`,
+      );
+    } else {
+      const wealth = player.getChips.getChipWealth;
+      player.getChips.takeHundreds(wealth.hundreds);
+      player.getChips.takeFifties(wealth.fifties);
+      player.getChips.takeTwenties(wealth.twenties);
+      player.getChips.takeTens(wealth.tens);
+      player.getChips.takeFives(wealth.fives);
+
+      await message.channel.send(`PLayer ${player.getTag} has gone all in!`);
+      return;
+    }
+  }
+
+  private async playerBetsBigBlind(
+    player: Player,
+    message: Message,
+  ): Promise<void> {
+    if (player.getChips.getAvailableTens >= 1) {
+      player.getChips.takeTens(1);
+      await message.channel.send(
+        `Player ${player.getTag} followed up with the big blind`,
+      );
+    } else if (player.getChips.getAvailableFives >= 2) {
+      player.getChips.takeFives(2);
+      await message.channel.send(
+        `Player ${player.getTag} followed up with the big blind`,
+      );
+    } else {
+      const wealth = player.getChips.getChipWealth;
+      player.getChips.takeHundreds(wealth.hundreds);
+      player.getChips.takeFifties(wealth.fifties);
+      player.getChips.takeTwenties(wealth.twenties);
+      player.getChips.takeTens(wealth.tens);
+      player.getChips.takeFives(wealth.fives);
+
+      await message.channel.send(`PLayer ${player.getTag} has gone all in!`);
+      return;
+    }
   }
 
   private resetTable(): void {
     this.cardSet = [];
-    this.betHeap = {
-      hundreds: 0,
-      fifties: 0,
-      twenties: 0,
-      tens: 0,
-      fives: 0,
-    };
     this.players = [];
-    this.setMatch = false;
+    this.activePlayers = [];
+    this.betHeap.resetChips();
+    this.setGame = false;
     this.setCurrentTurn = null;
-    this.setNewGameState = 'Start';
+    this.setNewMatchState = 'Start';
   }
 
   findPlayer(tag: string): Player | false {
@@ -370,23 +413,31 @@ export class PokerService {
 
       this.players.push(new Player(playerTag, hand));
     });
+    this.betHeap = new Chips(0, 0, 0, 0, 0);
     this.setInterestedPlayers = [];
-    this.setMatch = true;
-    this.setCurrentTurn = this.players[0];
-    this.setNewGameState = 'Start';
-    this.betHeap = {
-      hundreds: 0,
-      fifties: 0,
-      twenties: 0,
-      tens: 0,
-      fives: 0,
-    };
+    this.setActivePlayers = this.players;
+    this.setGame = true;
+    this.setNewMatchState = 'Start';
+    await this.playerBetsSmallBlind(this.activePlayers[0], message);
+    await this.playerBetsBigBlind(this.activePlayers[1], message);
+    this.setCurrentTurn = this.activePlayers[2];
     await message.channel.send(
       `Poker table has been set up. It is ${this.getCurrentTurn.getTag}'s turn.`,
     );
   }
 
   async playerPasses(player: Player, message: Message): Promise<void> {
+    if (
+      !this.extendRoundDecisionPending &&
+      this.lastPlayerBet.getChipsRawAmount >
+        player.getBetAmount.getChipsRawAmount
+    ) {
+      await message.channel.send(
+        'You cannot pass after someone has made a bet. Either match the amount or fold your hand.',
+      );
+      return;
+    }
+
     if (this.extendRoundDecisionPending) {
       this.extendRound = false;
       this.extendRoundDecisionPending = false;
@@ -395,10 +446,10 @@ export class PokerService {
     await message.channel.send(
       `Player ${this.getCurrentTurn.getTag} has passed.`,
     );
-    await this.updateGameState(message);
+    await this.updateMatchState(message);
   }
 
-  async playerMakesBet(
+  async playerRaises(
     player: Player,
     amount: number,
     message: Message,
@@ -412,98 +463,76 @@ export class PokerService {
     const playerWealth: ChipsInterface = playerChips.getChipWealth;
     let rawBetAmount = 0;
 
-    if (amount === player.getChips.getChipsRawAmount) {
-      this.betHeap.hundreds += playerWealth.hundreds;
-      this.betHeap.fifties += playerWealth.fifties;
-      this.betHeap.twenties += playerWealth.twenties;
-      this.betHeap.tens += playerWealth.tens;
-      this.betHeap.fives += playerWealth.fives;
-
-      playerChips.takeHundreds(playerWealth.hundreds);
-      playerChips.takeFifties(playerWealth.fifties);
-      playerChips.takeTwenties(playerWealth.twenties);
-      playerChips.takeTens(playerWealth.tens);
-      playerChips.takeFives(playerWealth.fives);
-    } else if (amount % 100 === 0) {
-      if (playerWealth.hundreds < amount / 100) {
-        await message.channel.send(
-          `You only have ${playerWealth.hundreds} tokens worth 100. Please bet an amount that you actually own!`,
-        );
-        return;
-      }
-      this.betHeap.hundreds += amount / 100;
-      playerChips.takeHundreds(amount / 100);
-    } else if (amount % 50 === 0) {
-      if (playerWealth.fifties < amount / 50) {
-        await message.channel.send(
-          `You only have ${playerWealth.fifties} tokens worth 50. Please bet an amount that you actually own!`,
-        );
-        return;
-      }
-
-      this.betHeap.fifties += amount / 50;
-      playerChips.takeFifties(amount / 50);
-    } else if (amount % 20 === 0) {
-      if (playerWealth.twenties < amount / 20) {
-        await message.channel.send(
-          `You only have ${playerWealth.twenties} tokens worth 20. Please bet an amount that you actually own!`,
-        );
-        return;
-      }
-
-      this.betHeap.twenties += amount / 20;
-      playerChips.takeTwenties(amount / 20);
-    } else if (amount % 10 === 0) {
-      if (playerWealth.tens < amount / 10) {
-        await message.channel.send(
-          `You only have ${playerWealth.tens} tokens worth 10. Please bet an amount that you actually own!`,
-        );
-        return;
-      }
-
-      this.betHeap.tens += amount / 10;
-      playerChips.takeTens(amount / 10);
-    } else if (amount % 5 === 0) {
-      if (playerWealth.fives < amount / 5) {
-        await message.channel.send(
-          `You only have ${playerWealth.fives} tokens worth 5. Please bet an amount that you actually own!`,
-        );
-        return;
-      }
-
-      this.betHeap.fives += amount / 5;
-      playerChips.takeFives(amount / 5);
-    } else {
-      await message.channel.send(
-        'You can only use tokens to bet. Please bet a correct amount!',
-      );
+    if (amount > playerChips.getChipsRawAmount) {
+      await message.channel.send(`You don't have enough tokens!`);
       return;
     }
 
-    rawBetAmount += amount;
+    while (rawBetAmount < amount) {
+      if (amount === playerChips.getChipsRawAmount) {
+        this.betHeap.addHundreds(playerWealth.hundreds);
+        this.betHeap.addFifties(playerWealth.fifties);
+        this.betHeap.addTwenties(playerWealth.twenties);
+        this.betHeap.addTens(playerWealth.tens);
+        this.betHeap.addFives(playerWealth.fives);
 
-    if (this.turn.getChips.getChipsRawAmount === rawBetAmount) {
+        playerChips.takeHundreds(playerWealth.hundreds);
+        playerChips.takeFifties(playerWealth.fifties);
+        playerChips.takeTwenties(playerWealth.twenties);
+        playerChips.takeTens(playerWealth.tens);
+        playerChips.takeFives(playerWealth.fives);
+
+        rawBetAmount += amount;
+      } else if (amount % 100 === 0) {
+        this.betHeap.addHundreds(amount / 100);
+        playerChips.takeHundreds(amount / 100);
+        rawBetAmount += amount / 100;
+      } else if (amount % 50 === 0) {
+        this.betHeap.addFifties(amount / 50);
+        playerChips.takeFifties(amount / 50);
+        rawBetAmount += amount / 50;
+      } else if (amount % 20 === 0) {
+        this.betHeap.addTwenties(amount / 20);
+        playerChips.takeTwenties(amount / 20);
+        rawBetAmount += amount / 20;
+      } else if (amount % 10 === 0) {
+        this.betHeap.addTens(amount / 10);
+        playerChips.takeTens(amount / 10);
+        rawBetAmount += amount / 10;
+      } else if (amount % 5 === 0) {
+        this.betHeap.addFives(amount / 5);
+        playerChips.takeFives(amount / 5);
+        rawBetAmount += amount / 5;
+      } else {
+        await message.channel.send(
+          'You can only use tokens to bet. Please bet a correct amount!',
+        );
+        return;
+      }
+    }
+
+    if (playerChips.getChipsRawAmount === 0) {
       await message.channel.send(`Player ${this.turn.getTag} has gone all in!`);
-    } else if (this.turn.getChips.getChipsRawAmount < rawBetAmount) {
+    } else {
       await message.channel.send(
         `Player ${this.turn.getTag} has made a bet of ${amount}.`,
       );
     }
 
-    await this.updateGameState(message);
+    await this.updateMatchState(message);
   }
 
   async playerFoldsHand(player: Player, message: Message): Promise<void> {
-    if (this.turn.getTag === player.getTag) {
-      this.players = this.players.filter(
-        (thisPlayer) => thisPlayer.getTag !== player.getTag,
-      );
-      await message.channel.send(
-        `Player ${message.author.tag} has folded his hand.`,
-      );
-      await this.updateGameState(message);
-    } else {
-      throw new InternalServerErrorException('Player turn inconsistency.');
-    }
+    const turn = this.getCurrentTurn;
+    const playerIndex = this.activePlayers.indexOf(turn);
+    const newTurn = (this.setCurrentTurn = this.activePlayers[playerIndex + 1]);
+
+    this.activePlayers = this.activePlayers.filter(
+      (thisPlayer) => thisPlayer.getTag !== player.getTag,
+    );
+    await message.channel.send(
+      `Player ${message.author.tag} has folded his hand.`,
+    );
+    await message.channel.send(`It is ${newTurn.getTag}'s turn.`);
   }
 }

@@ -29,6 +29,7 @@ export class BotGateway {
   @OnCommand({
     name: 'sourcecode',
     channelType: ['text'],
+    allowChannels: ['360812727964532737'],
     isIgnoreBotMessage: true,
   })
   async onCommandCode(message: Message) {
@@ -38,6 +39,7 @@ export class BotGateway {
   @OnCommand({
     name: 'poker',
     channelType: ['text'],
+    allowChannels: ['360812727964532737'],
     isIgnoreBotMessage: true,
   })
   async onCommandPoker(message: Message): Promise<void> {
@@ -48,9 +50,14 @@ export class BotGateway {
     // this.dealerService.addInterestedPlayer(message.author.tag);
   }
 
-  @OnCommand({ name: 'join', channelType: ['text'], isIgnoreBotMessage: true })
+  @OnCommand({
+    name: 'join',
+    channelType: ['text'],
+    allowChannels: ['360812727964532737'],
+    isIgnoreBotMessage: true,
+  })
   async onCommandJoin(message: Message): Promise<void> {
-    if (this.dealerService.matchIsOngoing) {
+    if (this.dealerService.gameIsOngoing) {
       await message.channel.send(
         'A match has already started. Please wait until it has finished to propose another one.',
       );
@@ -65,9 +72,14 @@ export class BotGateway {
     }
   }
 
-  @OnCommand({ name: 'fold', channelType: ['text'], isIgnoreBotMessage: true })
+  @OnCommand({
+    name: 'fold',
+    channelType: ['text'],
+    allowChannels: ['360812727964532737'],
+    isIgnoreBotMessage: true,
+  })
   async onCommandFold(message: Message): Promise<void> {
-    if (this.dealerService.matchIsOngoing) {
+    if (this.dealerService.gameIsOngoing) {
       const player = this.dealerService.findPlayer(message.author.tag);
 
       if (player) {
@@ -83,19 +95,22 @@ export class BotGateway {
         await message.channel.send(
           "You cannot forfeit a match that you aren't participating in.",
         );
-        return;
       }
     } else {
       await message.channel.send(
         'This command only works when a poker match is ongoing.',
       );
-      return;
     }
   }
 
-  @OnCommand({ name: 'pass', channelType: ['text'], isIgnoreBotMessage: true })
+  @OnCommand({
+    name: 'pass',
+    channelType: ['text'],
+    allowChannels: ['360812727964532737'],
+    isIgnoreBotMessage: true,
+  })
   async onCommandPass(message: Message): Promise<void> {
-    if (this.dealerService.matchIsOngoing) {
+    if (this.dealerService.gameIsOngoing) {
       const player = this.dealerService.findPlayer(message.author.tag);
 
       if (player) {
@@ -111,22 +126,25 @@ export class BotGateway {
         await message.channel.send(
           "You cannot bet in a match that you aren't participating in.",
         );
-        return;
       }
     } else {
       await message.channel.send(
         'This command only works when a poker match is ongoing.',
       );
-      return;
     }
   }
 
-  @OnCommand({ name: 'bet', channelType: ['text'], isIgnoreBotMessage: true })
-  async onCommandBet(
+  @OnCommand({
+    name: 'raise',
+    channelType: ['text'],
+    allowChannels: ['360812727964532737'],
+    isIgnoreBotMessage: true,
+  })
+  async onCommandRaise(
     @Content() content: string,
     @Context() [context]: [Message],
   ): Promise<void> {
-    if (this.dealerService.matchIsOngoing) {
+    if (this.dealerService.gameIsOngoing) {
       const player = this.dealerService.findPlayer(context.author.tag);
 
       if (player) {
@@ -137,13 +155,13 @@ export class BotGateway {
           return;
         }
 
-        const amount = isNaN(+content) === true ? false : +content;
+        const amount = isNaN(+content) === true ? NaN : +content;
         if (!amount) {
           await context.channel.send('Please bet a numeric amount.');
           return;
         }
 
-        await this.dealerService.playerMakesBet(player, amount, context);
+        await this.dealerService.playerRaises(player, amount, context);
       } else {
         await context.channel.send(
           "You cannot bet in a match that you aren't participating in.",
@@ -160,7 +178,7 @@ export class BotGateway {
 
   @OnCommand({ name: 'wealth', channelType: ['dm'], isIgnoreBotMessage: true })
   async onCommandWealth(message: Message): Promise<void> {
-    if (this.dealerService.matchIsOngoing) {
+    if (this.dealerService.gameIsOngoing) {
       const player = this.dealerService.findPlayer(message.author.tag);
 
       if (player) {

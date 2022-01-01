@@ -13,13 +13,13 @@ enum ChipTypes {
 export class Chips {
   private readonly chips: ChipsInterface;
 
-  constructor() {
+  constructor(fives = 10, tens = 5, twenties = 5, fifties = 2, hundreds = 1) {
     this.chips = {
-      fives: 10,
-      tens: 5,
-      twenties: 5,
-      fifties: 2,
-      hundreds: 1,
+      fives,
+      tens,
+      twenties,
+      fifties,
+      hundreds,
     };
   }
 
@@ -57,43 +57,59 @@ export class Chips {
     return rawAmount;
   }
 
-  set addFives(amount) {
+  get getAvailableFives(): number {
+    return this.chips.fives;
+  }
+
+  get getAvailableTens(): number {
+    return this.chips.tens;
+  }
+
+  resetChips(): void {
+    this.chips.hundreds = 0;
+    this.chips.fifties = 0;
+    this.chips.twenties = 0;
+    this.chips.tens = 0;
+    this.chips.fives = 0;
+  }
+
+  addFives(amount) {
     this.chips.fives += amount;
   }
 
-  set takeFives(amount) {
+  takeFives(amount) {
     this.chips.fives -= amount;
   }
 
-  set addTens(amount) {
+  addTens(amount) {
     this.chips.tens += amount;
   }
 
-  set takeTens(amount) {
+  takeTens(amount) {
     this.chips.tens -= amount;
   }
 
-  set addTwenties(amount) {
+  addTwenties(amount) {
     this.chips.twenties += amount;
   }
 
-  set takeTwenties(amount) {
+  takeTwenties(amount) {
     this.chips.twenties -= amount;
   }
 
-  set addFifties(amount) {
+  addFifties(amount) {
     this.chips.fifties += amount;
   }
 
-  set takeFifties(amount) {
+  takeFifties(amount) {
     this.chips.fifties -= amount;
   }
 
-  set addHundreds(amount) {
+  addHundreds(amount) {
     this.chips.hundreds += amount;
   }
 
-  set takeHundreds(amount) {
+  takeHundreds(amount) {
     this.chips.hundreds -= amount;
   }
 }
