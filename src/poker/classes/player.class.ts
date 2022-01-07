@@ -26,7 +26,7 @@ export class Player {
     return this.chips;
   }
 
-  get getBetAmount(): Chips{
+  get getBetAmount(): Chips {
     return this.betAmount;
   }
 }

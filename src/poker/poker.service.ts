@@ -39,8 +39,8 @@ enum WinningConditions {
 export class PokerService {
   // Per Game
   private deck: Deck;
-  private players: Player[];
-  private interestedPlayers: string[];
+  private players: Player[] = [];
+  private interestedPlayers: string[] = [];
   private game: boolean;
 
   // Per Match
@@ -284,7 +284,7 @@ export class PokerService {
       this.setCurrentTurn = this.activePlayers[0];
       await message.channel.send(
         `${this.getCurrentTurn.getTag}, do you want to raise and continue the round, or do you want to move on to the next round?
-        Use the command "raise" to raise or "pass" to move on to the next round.`,
+        Use the command "raise" to raise or "check" to move on to the next round.`,
       );
       this.extendRoundDecisionPending = true;
       return;
@@ -418,22 +418,26 @@ export class PokerService {
     this.setActivePlayers = this.players;
     this.setGame = true;
     this.setNewMatchState = 'Start';
-    await this.playerBetsSmallBlind(this.activePlayers[0], message);
-    await this.playerBetsBigBlind(this.activePlayers[1], message);
-    this.setCurrentTurn = this.activePlayers[2];
-    await message.channel.send(
-      `Poker table has been set up. It is ${this.getCurrentTurn.getTag}'s turn.`,
-    );
+    await message.channel.send('Poker table has been set up.');
+
+    await this.autoMatchOpenings(message);
   }
 
-  async playerPasses(player: Player, message: Message): Promise<void> {
+  private async autoMatchOpenings(message: Message) {
+    await this.playerBetsSmallBlind(this.activePlayers[0], message);
+    await this.playerBetsBigBlind(this.activePlayers[0], message); // change this line
+    this.setCurrentTurn = this.activePlayers[0]; // change this line
+    await message.channel.send(`It is ${this.getCurrentTurn.getTag}'s turn.`);
+  }
+
+  async playerChecks(player: Player, message: Message): Promise<void> {
     if (
       !this.extendRoundDecisionPending &&
       this.lastPlayerBet.getChipsRawAmount >
         player.getBetAmount.getChipsRawAmount
     ) {
       await message.channel.send(
-        'You cannot pass after someone has made a bet. Either match the amount or fold your hand.',
+        'You cannot check after someone has made a bet. Either match the amount or fold your hand.',
       );
       return;
     }
@@ -444,7 +448,7 @@ export class PokerService {
     }
 
     await message.channel.send(
-      `Player ${this.getCurrentTurn.getTag} has passed.`,
+      `Player ${this.getCurrentTurn.getTag} has checked.`,
     );
     await this.updateMatchState(message);
   }
@@ -525,7 +529,8 @@ export class PokerService {
   async playerFoldsHand(player: Player, message: Message): Promise<void> {
     const turn = this.getCurrentTurn;
     const playerIndex = this.activePlayers.indexOf(turn);
-    const newTurn = (this.setCurrentTurn = this.activePlayers[playerIndex + 1]);
+    this.setCurrentTurn = this.activePlayers[playerIndex + 1];
+    const newTurn = this.getCurrentTurn;
 
     this.activePlayers = this.activePlayers.filter(
       (thisPlayer) => thisPlayer.getTag !== player.getTag,

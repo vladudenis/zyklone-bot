@@ -9,6 +9,8 @@ import {
 } from 'discord-nestjs';
 import { Message } from 'discord.js';
 import { PokerService } from './poker/poker.service';
+import ensureBasicRequirements from './poker/utils/ensureBasicRequirements';
+import ensureAdvancedRequirements from './poker/utils/ensureAdvancedRequirements';
 
 @Injectable()
 export class BotGateway {
@@ -47,7 +49,7 @@ export class BotGateway {
       `User ${message.author} has proposed a poker match. Use the command "join" to join the match.
       The match will automatically start once the cap of 4 players has been reached.`,
     );
-    // this.dealerService.addInterestedPlayer(message.author.tag);
+    this.dealerService.addInterestedPlayer(message.author.tag);
   }
 
   @OnCommand({
@@ -66,7 +68,7 @@ export class BotGateway {
 
     this.dealerService.addInterestedPlayer(message.author.tag);
 
-    if (this.dealerService.getInterestedPlayers.length === 1) {
+    if (this.dealerService.getInterestedPlayers.length === 4) {
       await message.channel.send('Setting up poker table...');
       await this.dealerService.initPokerTable(message);
     }
@@ -79,58 +81,58 @@ export class BotGateway {
     isIgnoreBotMessage: true,
   })
   async onCommandFold(message: Message): Promise<void> {
-    if (this.dealerService.gameIsOngoing) {
-      const player = this.dealerService.findPlayer(message.author.tag);
+    const player = await ensureBasicRequirements(message);
 
-      if (player) {
-        if (this.dealerService.getCurrentTurn.getTag !== message.author.tag) {
-          await message.channel.send(
-            'Wait until your turn has come in order to fold your hand.',
-          );
-          return;
-        }
-
-        await this.dealerService.playerFoldsHand(player, message);
-      } else {
+    switch (player) {
+      case -1:
         await message.channel.send(
-          "You cannot forfeit a match that you aren't participating in.",
+          'This command only works when a poker match is ongoing.',
         );
-      }
-    } else {
-      await message.channel.send(
-        'This command only works when a poker match is ongoing.',
-      );
+        return;
+      case -2:
+        await message.channel.send(
+          "You cannot fold a match that you aren't participating in.",
+        );
+        return;
+      case -3:
+        await message.channel.send(
+          'Wait until your turn has come in order to fold your hand.',
+        );
+        return;
+      default:
+        await this.dealerService.playerFoldsHand(player, message);
+        break;
     }
   }
 
   @OnCommand({
-    name: 'pass',
+    name: 'check',
     channelType: ['text'],
     allowChannels: ['360812727964532737'],
     isIgnoreBotMessage: true,
   })
-  async onCommandPass(message: Message): Promise<void> {
-    if (this.dealerService.gameIsOngoing) {
-      const player = this.dealerService.findPlayer(message.author.tag);
+  async onCommandCheck(message: Message): Promise<void> {
+    const player = await ensureBasicRequirements(message);
 
-      if (player) {
-        if (this.dealerService.getCurrentTurn.getTag !== message.author.tag) {
-          await message.channel.send(
-            'Wait until your turn has come in order to bet.',
-          );
-          return;
-        }
-
-        await this.dealerService.playerPasses(player, message);
-      } else {
+    switch (player) {
+      case -1:
         await message.channel.send(
-          "You cannot bet in a match that you aren't participating in.",
+          'This command only works when a poker match is ongoing.',
         );
-      }
-    } else {
-      await message.channel.send(
-        'This command only works when a poker match is ongoing.',
-      );
+        return;
+      case -2:
+        await message.channel.send(
+          "You cannot check in a match that you aren't participating in.",
+        );
+        return;
+      case -3:
+        await message.channel.send(
+          'Wait until your turn has come in order to check.',
+        );
+        return;
+      default:
+        await this.dealerService.playerChecks(player, message);
+        break;
     }
   }
 
@@ -144,47 +146,84 @@ export class BotGateway {
     @Content() content: string,
     @Context() [context]: [Message],
   ): Promise<void> {
-    if (this.dealerService.gameIsOngoing) {
-      const player = this.dealerService.findPlayer(context.author.tag);
+    const tuple = await ensureAdvancedRequirements(context, content);
 
-      if (player) {
-        if (this.dealerService.getCurrentTurn.getTag !== context.author.tag) {
-          await context.channel.send(
-            'Wait until your turn has come in order to bet.',
-          );
-          return;
-        }
-
-        const amount = isNaN(+content) === true ? NaN : +content;
-        if (!amount) {
-          await context.channel.send('Please bet a numeric amount.');
-          return;
-        }
-
-        await this.dealerService.playerRaises(player, amount, context);
-      } else {
+    switch (tuple) {
+      case -1:
+        await context.channel.send(
+          'This command only works when a poker match is ongoing.',
+        );
+        return;
+      case -2:
         await context.channel.send(
           "You cannot bet in a match that you aren't participating in.",
         );
         return;
-      }
-    } else {
-      await context.channel.send(
-        'This command only works when a poker match is ongoing.',
-      );
-      return;
+      case -3:
+        await context.channel.send(
+          'Wait until your turn has come in order to bet.',
+        );
+        return;
+      case -4:
+        await context.channel.send('Please bet a numeric amount.');
+        return;
+      default:
+        await this.dealerService.playerRaises(tuple[0], tuple[1], context);
+        break;
+    }
+  }
+
+  @OnCommand({
+    name: 'match',
+    channelType: ['text'],
+    allowChannels: ['360812727964532737'],
+    isIgnoreBotMessage: true,
+  })
+  async onCommandMatch(message: Message): Promise<void> {
+    const player = await ensureBasicRequirements(message);
+
+    switch (player) {
+      case -1:
+        await message.channel.send(
+          'This command only works when a poker match is ongoing.',
+        );
+        return;
+      case -2:
+        await message.channel.send(
+          "You cannot match in a match that you aren't participating in.",
+        );
+        return;
+      case -3:
+        await message.channel.send(
+          'Wait until your turn has come in order to match.',
+        );
+        return;
+      default:
+        // to be added
+        break;
     }
   }
 
   @OnCommand({ name: 'wealth', channelType: ['dm'], isIgnoreBotMessage: true })
   async onCommandWealth(message: Message): Promise<void> {
-    if (this.dealerService.gameIsOngoing) {
-      const player = this.dealerService.findPlayer(message.author.tag);
+    if (!this.dealerService.gameIsOngoing) {
+      await message.channel.send(
+        'This command only works when a poker match is ongoing.',
+      );
+      return;
+    }
 
-      if (player) {
-        const { hundreds, fifties, twenties, tens, fives } =
-          player.getChips.getChipWealth;
-        await message.channel.send(`
+    const player = this.dealerService.findPlayer(message.author.tag);
+    if (!player) {
+      await message.channel.send(
+        "You cannot possess wealth in a match that you aren't participating in.",
+      );
+      return;
+    }
+
+    const { hundreds, fifties, twenties, tens, fives } =
+      player.getChips.getChipWealth;
+    await message.channel.send(`
           ----
           Hundreds: ${hundreds}
           Fifties: ${fifties}
@@ -193,17 +232,5 @@ export class BotGateway {
           Fives: ${fives}
           Total: ${player.getChips.getChipsRawAmount}
          `);
-      } else {
-        await message.channel.send(
-          "You cannot possess wealth in a match that you aren't participating in.",
-        );
-        return;
-      }
-    } else {
-      await message.channel.send(
-        'This command only works when a poker match is ongoing.',
-      );
-      return;
-    }
   }
 }
