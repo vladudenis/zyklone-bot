@@ -68,7 +68,10 @@ export class BotGateway {
 
     this.dealerService.addInterestedPlayer(message.author.tag);
 
-    if (this.dealerService.getInterestedPlayers.length === 4) {
+    if (
+      this.dealerService.getInterestedPlayers.length ===
+      this.dealerService.getMaxPlayerCount
+    ) {
       await message.channel.send('Setting up poker table...');
       await this.dealerService.initPokerTable(message);
     }

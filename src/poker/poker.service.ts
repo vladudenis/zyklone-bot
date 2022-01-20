@@ -38,6 +38,9 @@ enum WinningConditions {
 
 @Injectable()
 export class PokerService {
+  // This is both the minimum and maximum number of players
+  private maxPlayers = 4;
+
   // Per Game
   private deck: Deck;
   private players: Player[] = [];
@@ -59,8 +62,24 @@ export class PokerService {
   private turn: Player;
 
   // Getters
+  get getMaxPlayerCount(): number {
+    return this.maxPlayers;
+  }
+
+  get getDeck(): Deck {
+    return this.deck;
+  }
+
   get getInterestedPlayers(): string[] {
     return this.interestedPlayers;
+  }
+
+  get getPlayers(): Player[] {
+    return this.players;
+  }
+
+  get getActivePlayers(): Player[] {
+    return this.activePlayers;
   }
 
   get gameIsOngoing(): boolean {
@@ -73,6 +92,10 @@ export class PokerService {
 
   get getCurrentGameState(): 'Start' | 'Flop' | 'Turn' | 'River' {
     return this.matchState;
+  }
+
+  get getBetHeap(): Chips {
+    return this.betHeap;
   }
 
   findPlayer(tag: string): Player | false {
@@ -307,7 +330,7 @@ export class PokerService {
     this.setNewMatchState = 'Start';
   }
 
-  async initPokerTable(message: Message): Promise<void> {
+  async initPokerTable(message?: Message): Promise<void> {
     this.deck = new Deck();
     this.interestedPlayers.forEach((playerTag) => {
       const firstCard = this.deck.pickRandomCard;
@@ -321,8 +344,12 @@ export class PokerService {
     this.setActivePlayers = this.players;
     this.setGame = true;
     this.setNewMatchState = 'Start';
-    await message.channel.send('Poker table has been set up.');
 
+    if (!message) {
+      return;
+    }
+
+    await message.channel.send('Poker table has been set up.');
     await this.autoMatchOpenings(message);
   }
 

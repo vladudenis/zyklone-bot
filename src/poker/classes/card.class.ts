@@ -11,4 +11,8 @@ export class Card {
   get getRank(): string {
     return this.card[1];
   }
+
+  get getUniqueIdentifier(): string {
+    return `${this.card[0]}${this.card[1]}`;
+  }
 }

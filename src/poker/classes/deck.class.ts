@@ -32,17 +32,21 @@ export class Deck {
   constructor() {
     this.deck = [];
 
-    let i = 0;
-    while (i <= 52) {
-      for (let j = 0; j <= 3; j++) {
-        for (let k = 0; k <= 12; k++) {
-          this.deck.push(new Card([Suits[j], Ranks[k]]));
-          i++;
-        }
+    for (let j = 0; j <= 3; j++) {
+      for (let k = 0; k <= 12; k++) {
+        this.deck.push(new Card([Suits[j], Ranks[k]]));
       }
     }
 
     this.shuffleDeck();
+  }
+
+  get getDeck(): Card[] {
+    return this.deck;
+  }
+
+  get getDeckSize(): number {
+    return this.deck.length;
   }
 
   get pickRandomCard(): Card {

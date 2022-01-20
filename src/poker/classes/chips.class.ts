@@ -65,6 +65,18 @@ export class Chips {
     return this.chips.tens;
   }
 
+  get getAvailableTwenties(): number {
+    return this.chips.twenties;
+  }
+
+  get getAvailableFifties(): number {
+    return this.chips.fifties;
+  }
+
+  get getAvailableHundreds(): number {
+    return this.chips.hundreds;
+  }
+
   resetChips(): void {
     this.chips.hundreds = 0;
     this.chips.fifties = 0;
