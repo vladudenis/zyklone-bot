@@ -1,22 +1,21 @@
 import { PokerService } from './poker.service';
 import { Chips } from './classes/chips.class';
+import { Player } from './classes/player.class';
+import { Deck } from './classes/deck.class';
 
 describe('PokerService', () => {
   let pokerService: PokerService;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     pokerService = new PokerService();
     for (let i = 0; i < pokerService.getMaxPlayerCount; i++) {
       pokerService.addInterestedPlayer(`player${i}`);
     }
+    await pokerService.initPokerTable();
   });
 
   describe('initPokerTable', () => {
-    beforeEach(async () => {
-      await pokerService.initPokerTable();
-    });
-
-    it('has created a deck', () => {
+    it('creates a deck', () => {
       // Deck has the correct size
       const deck = pokerService.getDeck;
       expect(deck.getDeckSize).toBe(52);
@@ -35,7 +34,7 @@ describe('PokerService', () => {
       expect(duplicates.length).toBe(0);
     });
 
-    it('has added all interested players to the current game', () => {
+    it('adds all interested players to the current game', () => {
       expect(pokerService.getInterestedPlayers.length).toBe(0);
       expect(pokerService.getPlayers.length).toBe(
         pokerService.getMaxPlayerCount,
@@ -43,7 +42,7 @@ describe('PokerService', () => {
       expect(pokerService.getActivePlayers).toBe(pokerService.getPlayers);
     });
 
-    it('has given each player a hand', () => {
+    it('gives each player a hand', () => {
       const players = pokerService.getPlayers;
       const previousHands = [];
 
@@ -57,8 +56,13 @@ describe('PokerService', () => {
       expect(previousHands.length).toBe(pokerService.getMaxPlayerCount);
     });
 
-    it('has created a bet heap', () => {
-      const expectedBetHeap = new Chips(0, 0, 0, 0, 0);
+    it("sets the next player's turn correctly", () => {
+      const expectedCurrentTurn = pokerService.getPlayers[2];
+      expect(pokerService.getCurrentTurn).toBe(expectedCurrentTurn);
+    });
+
+    it('creates a bet heap', () => {
+      const expectedBetHeap = new Chips(1, 1, 0, 0, 0);
       const betHeap = pokerService.getBetHeap;
 
       // Bet heap is the same as the expected bet heap
@@ -76,11 +80,26 @@ describe('PokerService', () => {
       expect(betHeap.getChipsRawAmount).toBe(expectedBetHeap.getChipsRawAmount);
     });
 
-    it('has set the game and match state', () => {
+    it('sets the game and match state', () => {
       expect(pokerService.gameIsOngoing).toBe(true);
       expect(pokerService.getCurrentGameState).toBe('Start');
     });
   });
 
-  // describe('', () => {});
+  describe('playerChecks', () => {
+    it('updates the match state correctly', async () => {
+      for (let i = 2; i <= pokerService.getMaxPlayerCount; i++) {
+        if (i !== pokerService.getMaxPlayerCount) {
+          expect(pokerService.getCurrentTurn).toBe(
+            pokerService.getActivePlayers[i],
+          );
+        }
+
+        await pokerService.playerChecks(pokerService.getCurrentTurn, undefined);
+      }
+
+      expect(pokerService.getCurrentGameState).toBe('Flop');
+      expect(pokerService.getCardSet.length).toBe(3);
+    });
+  });
 });

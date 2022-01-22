@@ -94,6 +94,10 @@ export class PokerService {
     return this.matchState;
   }
 
+  get getCardSet(): Card[] {
+    return this.cardSet;
+  }
+
   get getBetHeap(): Chips {
     return this.betHeap;
   }
@@ -108,45 +112,43 @@ export class PokerService {
   }
 
   // Setters
-  private set setGame(state: boolean) {
+  set setGame(state: boolean) {
     this.game = state;
   }
 
-  private set setInterestedPlayers(players: string[]) {
+  set setInterestedPlayers(players: string[]) {
     this.interestedPlayers = players;
   }
 
-  private set setActivePlayers(players: Player[]) {
+  set setActivePlayers(players: Player[]) {
     this.activePlayers = players;
   }
 
-  private set setCurrentTurn(player: Player) {
+  set setCurrentTurn(player: Player) {
     this.turn = player;
   }
 
-  private set setNewMatchState(state: 'Start' | 'Flop' | 'Turn' | 'River') {
+  set setNewMatchState(state: 'Start' | 'Flop' | 'Turn' | 'River') {
     this.matchState = state;
   }
 
-  private set setCardSet(cardSet: Card[]) {
+  set setCardSet(cardSet: Card[]) {
     this.cardSet = cardSet;
   }
 
-  private set setPlayers(players: Player[]) {
+  set setPlayers(players: Player[]) {
     this.players = players;
   }
 
-  private set setExtendRound(extendRound: boolean) {
+  set setExtendRound(extendRound: boolean) {
     this.extendRound = extendRound;
   }
 
-  private set setExtendRoundDecisionPending(
-    extendRoundDecisionPending: boolean,
-  ) {
+  set setExtendRoundDecisionPending(extendRoundDecisionPending: boolean) {
     this.extendRoundDecisionPending = extendRoundDecisionPending;
   }
 
-  private set setLastPlayerBet(lastPlayerBet: Chips) {
+  set setLastPlayerBet(lastPlayerBet: Chips) {
     this.lastPlayerBet = lastPlayerBet;
   }
 
@@ -157,13 +159,18 @@ export class PokerService {
   // Player Actions
   private async playerBetsSmallBlind(
     player: Player,
-    message: Message,
+    message?: Message,
   ): Promise<void> {
     if (player.getChips.getAvailableFives >= 1) {
       player.getChips.takeFives(1);
-      await message.channel.send(
-        `Player ${player.getTag} opened with the small blind`,
-      );
+      this.betHeap.addFives(1);
+      this.setLastPlayerBet = new Chips(1, 0, 0, 0, 0);
+
+      if (message) {
+        await message.channel.send(
+          `Player ${player.getTag} opened with the small blind`,
+        );
+      }
     } else {
       const wealth = player.getChips.getChipWealth;
       player.getChips.takeHundreds(wealth.hundreds);
@@ -172,25 +179,34 @@ export class PokerService {
       player.getChips.takeTens(wealth.tens);
       player.getChips.takeFives(wealth.fives);
 
-      await message.channel.send(`PLayer ${player.getTag} has gone all in!`);
-      return;
+      if (message) {
+        await message.channel.send(`PLayer ${player.getTag} has gone all in!`);
+      }
     }
   }
 
   private async playerBetsBigBlind(
     player: Player,
-    message: Message,
+    message?: Message,
   ): Promise<void> {
     if (player.getChips.getAvailableTens >= 1) {
       player.getChips.takeTens(1);
-      await message.channel.send(
-        `Player ${player.getTag} followed up with the big blind`,
-      );
+      this.betHeap.addTens(1);
+      this.setLastPlayerBet = new Chips(0, 1, 0, 0, 0);
+
+      if (message) {
+        await message.channel.send(
+          `Player ${player.getTag} followed up with the big blind`,
+        );
+      }
     } else if (player.getChips.getAvailableFives >= 2) {
       player.getChips.takeFives(2);
-      await message.channel.send(
-        `Player ${player.getTag} followed up with the big blind`,
-      );
+
+      if (message) {
+        await message.channel.send(
+          `Player ${player.getTag} followed up with the big blind`,
+        );
+      }
     } else {
       const wealth = player.getChips.getChipWealth;
       player.getChips.takeHundreds(wealth.hundreds);
@@ -199,16 +215,18 @@ export class PokerService {
       player.getChips.takeTens(wealth.tens);
       player.getChips.takeFives(wealth.fives);
 
-      await message.channel.send(`PLayer ${player.getTag} has gone all in!`);
-      return;
+      if (message) {
+        await message.channel.send(`PLayer ${player.getTag} has gone all in!`);
+      }
     }
   }
 
-  async playerChecks(player: Player, message: Message): Promise<void> {
+  async playerChecks(player: Player, message?: Message): Promise<void> {
     if (
       !this.extendRoundDecisionPending &&
       this.lastPlayerBet.getChipsRawAmount >
-        player.getBetAmount.getChipsRawAmount
+        player.getBetAmount.getChipsRawAmount &&
+      message
     ) {
       await message.channel.send(
         'You cannot check after someone has made a bet. Either match the amount or fold your hand.',
@@ -222,9 +240,12 @@ export class PokerService {
       this.extendRoundDecisionPending = false;
     }
 
-    await message.channel.send(
-      `Player ${this.getCurrentTurn.getTag} has checked.`,
-    );
+    if (message) {
+      await message.channel.send(
+        `Player ${this.getCurrentTurn.getTag} has checked.`,
+      );
+    }
+
     await this.updateMatchState(message);
   }
 
@@ -307,7 +328,7 @@ export class PokerService {
     this.setCurrentTurn = this.activePlayers[playerIndex + 1];
     const newTurn = this.getCurrentTurn;
 
-    this.activePlayers = this.activePlayers.filter(
+    this.setActivePlayers = this.activePlayers.filter(
       (thisPlayer) => thisPlayer.getTag !== player.getTag,
     );
     await message.channel.send(
@@ -318,15 +339,15 @@ export class PokerService {
 
   // Table Management
   private resetTable(): void {
-    this.setCardSet = null;
-    this.setLastPlayerBet = null;
+    this.setCardSet = undefined;
+    this.setLastPlayerBet = undefined;
     this.setPlayers = [];
     this.setActivePlayers = [];
     this.setExtendRound = undefined;
     this.setExtendRoundDecisionPending = undefined;
     this.betHeap.resetChips();
     this.setGame = false;
-    this.setCurrentTurn = null;
+    this.setCurrentTurn = undefined;
     this.setNewMatchState = 'Start';
   }
 
@@ -344,12 +365,13 @@ export class PokerService {
     this.setActivePlayers = this.players;
     this.setGame = true;
     this.setNewMatchState = 'Start';
+    this.setExtendRound = false;
+    this.setExtendRoundDecisionPending = false;
 
-    if (!message) {
-      return;
+    if (message) {
+      await message.channel.send('Poker table has been set up.');
     }
 
-    await message.channel.send('Poker table has been set up.');
     await this.autoMatchOpenings(message);
   }
 
@@ -523,12 +545,12 @@ export class PokerService {
     }
   }
 
-  private async updateMatchState(message: Message): Promise<void> {
+  private async updateMatchState(message?: Message): Promise<void> {
     const playerIndex = this.activePlayers.indexOf(this.getCurrentTurn);
-    const finishedRound = (playerIndex + 1) % this.activePlayers.length === 0;
+    const finishedRound = playerIndex === 0;
 
     if (finishedRound) {
-      if (this.extendRound === false) {
+      if (!this.extendRound) {
         switch (this.matchState) {
           case 'Start':
             this.setNewMatchState = 'Flop';
@@ -536,6 +558,11 @@ export class PokerService {
             const secondCard = this.deck.pickRandomCard;
             const thirdCard = this.deck.pickRandomCard;
             this.cardSet = [firstCard, secondCard, thirdCard];
+
+            if (!message) {
+              break;
+            }
+
             await message.channel.send(
               `Placed FLOP on the table: ${firstCard}, ${secondCard}, ${thirdCard}`,
             );
@@ -544,6 +571,11 @@ export class PokerService {
             this.setNewMatchState = 'Turn';
             const fourthCard = this.deck.pickRandomCard;
             this.cardSet.push(fourthCard);
+
+            if (!message) {
+              break;
+            }
+
             await message.channel.send(
               `Placed TURN on the table: ${fourthCard}`,
             );
@@ -552,6 +584,11 @@ export class PokerService {
             this.setNewMatchState = 'River';
             const fifthCard = this.deck.pickRandomCard;
             this.cardSet.push(fifthCard);
+
+            if (!message) {
+              break;
+            }
+
             await message.channel.send(
               `Placed RIVER on the table: ${fifthCard}`,
             );
@@ -564,27 +601,45 @@ export class PokerService {
             break;
         }
 
-        this.setCurrentTurn = this.activePlayers[0];
+        this.setCurrentTurn =
+          this.activePlayers[(playerIndex + 1) % this.activePlayers.length];
+
+        if (!message) {
+          return;
+        }
+
         await message.channel.send(
           `It is ${this.getCurrentTurn.getTag}'s turn.`,
         );
         return;
       }
 
-      this.setCurrentTurn = this.activePlayers[0];
+      this.setCurrentTurn =
+        this.activePlayers[(playerIndex + 1) % this.activePlayers.length];
+      this.extendRoundDecisionPending = true;
+
+      if (!message) {
+        return;
+      }
+
       await message.channel.send(
         `${this.getCurrentTurn.getTag}, do you want to raise and continue the round, or do you want to move on to the next round?
         Use the command "raise" to raise or "check" to move on to the next round.`,
       );
-      this.extendRoundDecisionPending = true;
+      return;
     }
 
     this.setCurrentTurn =
       this.activePlayers[(playerIndex + 1) % this.activePlayers.length];
+
+    if (!message) {
+      return;
+    }
+
     await message.channel.send(`It is ${this.getCurrentTurn.getTag}'s turn.`);
   }
 
-  private async autoMatchOpenings(message: Message) {
+  private async autoMatchOpenings(message?: Message) {
     if (this.activePlayers.length < 2) {
       return;
     }
@@ -593,9 +648,13 @@ export class PokerService {
     await this.playerBetsBigBlind(this.activePlayers[1], message);
 
     if (this.activePlayers.length >= 2) {
-      this.setCurrentTurn = this.activePlayers[0];
-    } else {
       this.setCurrentTurn = this.activePlayers[2];
+    } else {
+      this.setCurrentTurn = this.activePlayers[0];
+    }
+
+    if (!message) {
+      return;
     }
 
     await message.channel.send(`It is ${this.getCurrentTurn.getTag}'s turn.`);

@@ -5,13 +5,14 @@ import { Card } from './card.class';
 @Injectable()
 export class Player {
   private readonly chips: Chips;
-  private readonly betAmount: Chips;
+  private betAmount: Chips;
 
   constructor(
     private readonly tag: string,
     private readonly hand: [Card, Card],
   ) {
     this.chips = new Chips();
+    this.betAmount = new Chips(0, 0, 0, 0, 0);
   }
 
   get getTag(): string {
@@ -28,5 +29,9 @@ export class Player {
 
   get getBetAmount(): Chips {
     return this.betAmount;
+  }
+
+  set setBetAmount(amount: Chips) {
+    this.betAmount = amount;
   }
 }
