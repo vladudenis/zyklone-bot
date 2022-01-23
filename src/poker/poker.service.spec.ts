@@ -1,7 +1,5 @@
 import { PokerService } from './poker.service';
 import { Chips } from './classes/chips.class';
-import { Player } from './classes/player.class';
-import { Deck } from './classes/deck.class';
 
 describe('PokerService', () => {
   let pokerService: PokerService;
@@ -82,7 +80,7 @@ describe('PokerService', () => {
 
     it('sets the game and match state', () => {
       expect(pokerService.gameIsOngoing).toBe(true);
-      expect(pokerService.getCurrentGameState).toBe('Start');
+      expect(pokerService.getCurrentMatchState).toBe('Start');
     });
   });
 
@@ -98,8 +96,28 @@ describe('PokerService', () => {
         await pokerService.playerChecks(pokerService.getCurrentTurn, undefined);
       }
 
-      expect(pokerService.getCurrentGameState).toBe('Flop');
+      expect(pokerService.getCurrentMatchState).toBe('Flop');
       expect(pokerService.getCardSet.length).toBe(3);
+    });
+  });
+
+  describe('playerFoldsHand', () => {
+    it('removes players who folded from active players', async () => {
+      await pokerService.playerFoldsHand(pokerService.getCurrentTurn);
+      expect(pokerService.getActivePlayers.length).toBe(
+        pokerService.getMaxPlayerCount - 1,
+      );
+    });
+
+    it('handles mass folding correctly', async () => {
+      const activePlayers = pokerService.getActivePlayers;
+
+      for (let i = 0; i < pokerService.getMaxPlayerCount - 1; i++) {
+        await pokerService.playerFoldsHand(pokerService.getCurrentTurn);
+      }
+
+      // Starts new match, where the remaining players become active players
+      expect(activePlayers.length).toBe(pokerService.getMaxPlayerCount);
     });
   });
 });

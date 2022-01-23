@@ -90,7 +90,7 @@ export class PokerService {
     return this.turn;
   }
 
-  get getCurrentGameState(): 'Start' | 'Flop' | 'Turn' | 'River' {
+  get getCurrentMatchState(): 'Start' | 'Flop' | 'Turn' | 'River' {
     return this.matchState;
   }
 
@@ -223,7 +223,6 @@ export class PokerService {
 
   async playerChecks(player: Player, message?: Message): Promise<void> {
     if (
-      !this.extendRoundDecisionPending &&
       this.lastPlayerBet.getChipsRawAmount >
         player.getBetAmount.getChipsRawAmount &&
       message
@@ -322,19 +321,25 @@ export class PokerService {
     await this.updateMatchState(message);
   }
 
-  async playerFoldsHand(player: Player, message: Message): Promise<void> {
-    const turn = this.getCurrentTurn;
-    const playerIndex = this.activePlayers.indexOf(turn);
-    this.setCurrentTurn = this.activePlayers[playerIndex + 1];
-    const newTurn = this.getCurrentTurn;
+  async playerFoldsHand(player: Player, message?: Message): Promise<void> {
+    const playerIndex = this.activePlayers.indexOf(this.getCurrentTurn);
 
     this.setActivePlayers = this.activePlayers.filter(
       (thisPlayer) => thisPlayer.getTag !== player.getTag,
     );
-    await message.channel.send(
-      `Player ${message.author.tag} has folded his hand.`,
-    );
-    await message.channel.send(`It is ${newTurn.getTag}'s turn.`);
+    this.setCurrentTurn =
+      this.activePlayers[playerIndex % this.activePlayers.length];
+
+    if (message) {
+      if (this.getActivePlayers.length === 1) {
+        this.checkWhoWon();
+      }
+
+      await message.channel.send(
+        `Player ${message.author.tag} has folded his hand.`,
+      );
+      await message.channel.send(`It is ${this.getCurrentTurn.getTag}'s turn.`);
+    }
   }
 
   // Table Management
@@ -468,46 +473,48 @@ export class PokerService {
     return Math.max(...winCons);
   }
 
-  private async checkWhoWon(message: Message): Promise<void> {
+  private async checkWhoWon(message?: Message): Promise<void> {
     let winningPlayer: Player;
     const tie: Player[] = [];
 
-    this.activePlayers.forEach((player) => {
-      if (
-        !winningPlayer ||
-        this.computeHand(player.getHand) >
-          this.computeHand(winningPlayer.getHand)
-      ) {
-        winningPlayer = player;
-        tie.push(winningPlayer);
-      } else if (
-        tie.length === 0 ||
-        this.computeHand(player.getHand) ===
-          this.computeHand(winningPlayer.getHand)
-      ) {
-        tie.push(player);
-      }
-    });
-
-    if (tie.length > 1) {
-      const secondTie: Player[] = [];
-      tie.forEach((tiedPlayer) => {
-        const tiedPlayerHandValue =
-          Ranks[tiedPlayer.getHand[0].getRank] +
-          Ranks[tiedPlayer.getHand[1].getRank];
-        const winningPlayerHandValue =
-          Ranks[winningPlayer.getHand[0].getRank] +
-          Ranks[winningPlayer.getHand[1].getRank];
-        if (tiedPlayerHandValue > winningPlayerHandValue) {
-          winningPlayer = tiedPlayer;
-          secondTie.push(winningPlayer);
-        } else if (tiedPlayerHandValue === winningPlayerHandValue) {
-          secondTie.push(tiedPlayer);
+    if (this.getActivePlayers.length) {
+      this.activePlayers.forEach((player) => {
+        if (
+          !winningPlayer ||
+          this.computeHand(player.getHand) >
+            this.computeHand(winningPlayer.getHand)
+        ) {
+          winningPlayer = player;
+          tie.push(winningPlayer);
+        } else if (
+          tie.length === 0 ||
+          this.computeHand(player.getHand) ===
+            this.computeHand(winningPlayer.getHand)
+        ) {
+          tie.push(player);
         }
       });
 
-      if (secondTie.length > 1) {
-        winningPlayer = undefined;
+      if (tie.length > 1) {
+        const secondTie: Player[] = [];
+        tie.forEach((tiedPlayer) => {
+          const tiedPlayerHandValue =
+            Ranks[tiedPlayer.getHand[0].getRank] +
+            Ranks[tiedPlayer.getHand[1].getRank];
+          const winningPlayerHandValue =
+            Ranks[winningPlayer.getHand[0].getRank] +
+            Ranks[winningPlayer.getHand[1].getRank];
+          if (tiedPlayerHandValue > winningPlayerHandValue) {
+            winningPlayer = tiedPlayer;
+            secondTie.push(winningPlayer);
+          } else if (tiedPlayerHandValue === winningPlayerHandValue) {
+            secondTie.push(tiedPlayer);
+          }
+        });
+
+        if (secondTie.length > 1) {
+          winningPlayer = undefined;
+        }
       }
     }
 
@@ -532,22 +539,37 @@ export class PokerService {
             break;
         }
       }
+
+      if (!message) {
+        return;
+      }
+
       await message.channel.send(`${winningPlayer.getTag} has won this match!`);
     } else {
-      await message.channel.send("Nobody has won the match! It's a dead draw!");
+      if (message) {
+        await message.channel.send(
+          "Nobody has won the match! It's a dead draw!",
+        );
+      }
     }
 
     if (this.players.length) {
-      await message.channel.send('Starting a new match...');
+      if (message) {
+        await message.channel.send('Starting a new match...');
+      }
+      this.setActivePlayers = this.players;
+      await this.autoMatchOpenings(message);
     } else {
-      await message.channel.send(`${winningPlayer.getTag} has won the game!`);
+      if (message) {
+        await message.channel.send(`${winningPlayer.getTag} has won the game!`);
+      }
       this.resetTable();
     }
   }
 
   private async updateMatchState(message?: Message): Promise<void> {
     const playerIndex = this.activePlayers.indexOf(this.getCurrentTurn);
-    const finishedRound = playerIndex === 0;
+    const finishedRound = (playerIndex + 1) % this.activePlayers.length === 0;
 
     if (finishedRound) {
       if (!this.extendRound) {
@@ -601,8 +623,7 @@ export class PokerService {
             break;
         }
 
-        this.setCurrentTurn =
-          this.activePlayers[(playerIndex + 1) % this.activePlayers.length];
+        this.setCurrentTurn = this.activePlayers[0];
 
         if (!message) {
           return;
@@ -614,8 +635,7 @@ export class PokerService {
         return;
       }
 
-      this.setCurrentTurn =
-        this.activePlayers[(playerIndex + 1) % this.activePlayers.length];
+      this.setCurrentTurn = this.activePlayers[0];
       this.extendRoundDecisionPending = true;
 
       if (!message) {
